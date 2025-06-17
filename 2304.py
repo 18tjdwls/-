@@ -1,46 +1,31 @@
 import streamlit as st
-import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
-# 함수: 드레인 전류 계산 (단순 임계 동작 모델 사용)
-def calculate_drain_current(Vg, Vth, k):
-    if Vg < Vth:
+st.title("MOSFET 전류 계산기")
+
+Vgs = st.number_input("Vgs (게이트-소스 전압, V)를 입력하세요:", value=2.0)
+Vds = st.number_input("Vds (드레인-소스 전압, V)를 입력하세요:", value=5.0)
+Kn = st.number_input("Kn (MOSFET 성능 수치, mA/V^2)를 입력하세요:", value=0.5)
+Vth = st.number_input("Vth (임계 전압, V)를 입력하세요:", value=1.0)
+
+def calculate_current(Vgs, Vds, Kn, Vth):
+    if Vgs <= Vth:
         return 0
+    elif Vds < Vgs - Vth:
+        return Kn * ((Vgs - Vth) * Vds - (Vds ** 2) / 2)
     else:
-        return k * (Vg - Vth) ** 2
+        return (Kn / 2) * (Vgs - Vth) ** 2
 
-# Streamlit UI 구성
-st.title("MOSFET 임계 전압(Vth) 시뮬레이터")
+Id = calculate_current(Vgs, Vds, Kn, Vth)
+st.write(f"계산된 드레인 전류 Id는 {Id:.3f} mA 입니다.")
 
-# 사용자 입력 받기
-Vth = st.number_input("임계 전압 Vth (V)", min_value=0.0, max_value=10.0, value=2.0)
-k = st.number_input("상수 k (전류 계수)", min_value=0.01, max_value=10.0, value=1.0)
-start = st.number_input("시작 게이트 전압 Vg (V)", min_value=0.0, max_value=10.0, value=0.0)
-end = st.number_input("끝 게이트 전압 Vg (V)", min_value=0.0, max_value=20.0, value=5.0)
-step = st.number_input("증가 단위 (step)", min_value=0.01, max_value=5.0, value=0.1)
+Vds_values = np.linspace(0, 10, 200)
+Id_values = [calculate_current(Vgs, v, Kn, Vth) for v in Vds_values]
 
-# 버튼 누르면 계산 시작
-if st.button("시뮬레이션 시작"):
-    Vg_values = []
-    Id_values = []
-    Vg = start
+df = pd.DataFrame({
+    'Vds': Vds_values,
+    'Id': Id_values
+}).set_index('Vds')
 
-    while Vg <= end:
-        Id = calculate_drain_current(Vg, Vth, k)
-        Vg_values.append(round(Vg, 2))
-        Id_values.append(Id)
-        Vg += step
-
-    # 결과 표로 출력
-    st.subheader("시뮬레이션 결과")
-    results = {"Vg (V)": Vg_values, "Id (A)": Id_values}
-    st.dataframe(results)
-
-    # 그래프로 출력
-    st.subheader("드레인 전류(Id) vs 게이트 전압(Vg)")
-    fig, ax = plt.subplots()
-    ax.plot(Vg_values, Id_values, marker='o', linestyle='-', color='blue')
-    ax.set_xlabel("Vg (V)")
-    ax.set_ylabel("Id (A)")
-    ax.set_title("MOSFET 드레인 전류 특성")
-    ax.grid(True)
-    st.pyplot(fig)
+st.line_chart(df)
